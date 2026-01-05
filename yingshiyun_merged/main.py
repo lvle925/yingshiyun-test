@@ -3,10 +3,13 @@
 整合所有9个项目的API服务
 """
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
 from config import SERVICE_HOST, SERVICE_PORT, LOG_LEVEL
+from utils.metrics import unregister_default_collectors
 
 # 配置日志
 logging.basicConfig(
@@ -32,8 +35,6 @@ app.add_middleware(
 )
 
 # ==================== 导入路由 ====================
-# 注意: 这些导入需要在实际创建路由文件后取消注释
-
 from routers import leinuo_day, leinuo_llm
 from routers import qimen_day, qimen_llm
 from routers import ziwei_llm, ziwei_report, ziwei_year
@@ -57,6 +58,12 @@ app.include_router(ziwei_year.router, tags=["紫微年度报告"])
 app.include_router(year_score.router, tags=["年运势评分"])
 app.include_router(summary.router, tags=["总结服务"])
 
+# ==================== 监控端点 ====================
+@app.get("/metrics")
+async def metrics():
+    """Prometheus 指标端点"""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 # ==================== 健康检查端点 ====================
 @app.get("/health")
 async def health_check():
@@ -73,7 +80,8 @@ async def root():
     return {
         "message": "萤石云统一API服务",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "metrics": "/metrics"
     }
 
 # ==================== 启动事件 ====================
@@ -81,14 +89,14 @@ async def root():
 async def startup_event():
     """应用启动时执行"""
     logger.info("萤石云统一服务启动中...")
-    # 这里可以添加数据库连接池初始化、缓存初始化等
+    # 注销默认收集器以减少指标冗余
+    unregister_default_collectors()
     logger.info("服务启动完成")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭时执行"""
     logger.info("萤石云统一服务关闭中...")
-    # 这里可以添加资源清理逻辑
     logger.info("服务已关闭")
 
 # ==================== 主函数 ====================

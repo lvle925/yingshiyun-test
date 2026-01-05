@@ -15,7 +15,7 @@ from .chat_processor import *
 from config import APP_SECRETS as APP_SECRET # 检查配置
 from .models import SignableAPIRequest
 from security.verifier import signature_verifier
-from monitoring.monitor import REQUESTS_RECEIVED
+from utils.metrics import REQUESTS_RECEIVED
 from database import  db_manager
 from clients import external_api_client, vllm_client
 from clients import shared_client

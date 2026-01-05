@@ -1,13 +1,21 @@
 import json
 import logging
 import uuid
+import time
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+# 引用统一的指标定义
+from utils.metrics import (
+    REQUESTS_RECEIVED,
+    VLLM_REQUESTS_SENT_ATTEMPTS,
+    VLLM_RESPONSES_SUCCESS,
+    VLLM_RESPONSES_FAILED
+)
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / "api_monitor.log"
 
@@ -80,14 +88,14 @@ class StepMonitor(AbstractAsyncContextManager):
         self._start: Optional[float] = None
 
     def __enter__(self):
-        self._start = datetime.now().timestamp()
+        self._start = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc, tb):
         status = "失败" if exc else "成功"
         duration = 0.0
         if self._start is not None:
-            duration = max(datetime.now().timestamp() - self._start, 0)
+            duration = max(time.perf_counter() - self._start, 0)
         extra = dict(self.extra_data)
         extra["duration_sec"] = round(duration, 3)
         monitor_logger.info(
@@ -114,4 +122,3 @@ def log_step(
     monitor_logger.info(
         f"{step_name} | {status} | request_id={rid} | {_format_extra(extra_data)}"
     )
-

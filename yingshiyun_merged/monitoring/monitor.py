@@ -1,39 +1,61 @@
-# monitoring.py
+# monitoring/monitor.py
 
-from prometheus_client import Counter, REGISTRY, GC_COLLECTOR, PLATFORM_COLLECTOR, PROCESS_COLLECTOR
+import json
+import logging
+import time
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-# 注销默认的 Python 进程指标
-REGISTRY.unregister(GC_COLLECTOR)
-REGISTRY.unregister(PLATFORM_COLLECTOR)
-REGISTRY.unregister(PROCESS_COLLECTOR)
-
-# --- 自定义应用指标 ---
-REQUESTS_RECEIVED = Counter(
-    "api_requests_received_total",
-    "Total number of requests received at the /chat endpoint."
+# 引用统一的指标定义
+from utils.metrics import (
+    REQUESTS_RECEIVED,
+    VLLM_REQUESTS_SENT_ATTEMPTS,
+    VLLM_RESPONSES_SUCCESS,
+    VLLM_RESPONSES_FAILED
 )
 
-VLLM_REQUESTS_SENT_ATTEMPTS = Counter(
-    "vllm_requests_sent_attempts_total",
-    "Total attempts to send requests to VLLM after acquiring the semaphore."
-)
+# --- 日志配置 ---
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "api_monitor.log"
 
-VLLM_RESPONSES_SUCCESS = Counter(
-    "vllm_responses_success_total",
-    "Total number of successful and complete responses from VLLM."
-)
+def cleanup_old_logs(days_to_keep: int = 3) -> None:
+    """清理超过 `days_to_keep` 天的历史日志文件。"""
+    cutoff = datetime.now() - timedelta(days=days_to_keep)
+    for log_file in LOG_DIR.glob("api_monitor.log*"):
+        try:
+            if datetime.fromtimestamp(log_file.stat().st_mtime) < cutoff:
+                log_file.unlink(missing_ok=True)
+        except OSError:
+            continue
 
-VLLM_RESPONSES_FAILED = Counter(
-    "vllm_responses_failed_total",
-    "Total number of failed/errored responses from VLLM.",
-    ["reason"]
-)
+cleanup_old_logs()
 
+monitor_logger = logging.getLogger("api_monitor")
+if not monitor_logger.handlers:
+    handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+    handler.setFormatter(formatter)
+    monitor_logger.addHandler(handler)
+monitor_logger.setLevel(logging.INFO)
+monitor_logger.propagate = False
+
+# --- 工具函数 ---
 
 def generate_request_id() -> str:
     """生成 8 位 request_id，用于链路追踪。"""
     return uuid.uuid4().hex[:8]
+
+def _serialize_extra(extra_data: Optional[Dict[str, Any]]) -> str:
+    if not extra_data:
+        return ""
+    try:
+        return json.dumps(extra_data, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(extra_data)
 
 def log_step(
     step_name: str,
@@ -50,7 +72,6 @@ def log_step(
         status,
         _serialize_extra(extra_data),
     )
-
 
 @dataclass
 class StepMonitor:
