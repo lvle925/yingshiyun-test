@@ -77,10 +77,7 @@ from prompts import (
     ZINV_DOMAIN_TEMPLATE
 )
 
-# --- 日志配置 ---
-prometheus_client.REGISTRY.unregister(prometheus_client.GC_COLLECTOR)
-prometheus_client.REGISTRY.unregister(prometheus_client.PLATFORM_COLLECTOR)
-prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
+
 
 REQUESTS_RECEIVED = Counter(
     "api_requests_received_total",
@@ -2356,17 +2353,3 @@ async def chat_year(request_body: dict = Body(...)):
         except Exception as e:
             logger.error(f"更新用量统计时发生错误: {e}", exc_info=True)
 
-
-if __name__ == "__main__":
-    print("\n--- 启动说明 ---")
-    print("这是一个生成年度紫微斗数报告的FastAPI应用，已优化为固定输入格式和意图。")
-    print("\n--- 输入格式要求 ---")
-    print("请严格遵循以下格式提交查询：'YYYY年MM月DD日 HH:MM:SS 性别，[基础报告问题][；追问问题]'")
-    print("基础报告问题示例：'明年运势如何' 或 '明年主要运势如何' 或 '明年财运如何' 等")
-    print("追问问题为可选，例如: '2001年6月8日 14:00:00 男，明年财运如何；我何时能发财？'")
-    print("如果没有追问，则不带分号。")
-    print("\n--- 环境变量要求 ---")
-    print("\n--- 运行命令 (开发模式) ---")
-    print("uvicorn api_main:app --host 0.0.0.0 --port 8009 --reload")
-
-    uvicorn.run("api_main:app", host="0.0.0.0", port=8009, reload=True)

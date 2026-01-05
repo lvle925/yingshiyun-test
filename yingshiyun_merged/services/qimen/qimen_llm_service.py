@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from config import VLLM_API_BASE_URL, VLLM_MODEL_NAME, API_KEY, DB_CONFIG
 from monitoring.monitor import StepMonitor, log_step, generate_request_id
 from services.session.session_manager import initialize_session_manager, close_session_manager, get_session_history
-from services.validation.validation_rules import is_gibberish, detect_critical_time_selection, detect_sensitive_political_content, detect_finance_investment
+from services.validation.validation_rules import is_gibberish, detect_critical_time_selection, detect_sensitive_political_content,detect_finance_investment
 from services.qimen.user_info_extractor import extract_user_info, get_day_stem_from_gregorian_date
 from services.validation.query_intent import (
     classify_query_intent_with_llm, 
@@ -391,7 +391,7 @@ def generate_signature(params: Dict[str, Any], app_secret: str) -> str:
 
 
 # --- 应用启动和关闭事件 ---
-@app.on_event("startup")
+# @app.on_event("startup")
 async def startup_event():
     global async_aiohttp_client, vllm_semaphore, db_pool
     logger.info("FastAPI 应用启动中...")
@@ -433,7 +433,7 @@ async def startup_event():
     logger.info("FastAPI 应用启动完成。")
 
 
-@app.on_event("shutdown")
+# @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("FastAPI 应用关闭中...")
     

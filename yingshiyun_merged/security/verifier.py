@@ -5,7 +5,7 @@ import json
 from typing import Dict, Any
 #from fastapi import HTTPException, Body
 from fastapi import HTTPException, Request
-from config import APP_SECRET
+from config import APP_SECRETS as APP_SECRET
 
 def verify_signature(params: Dict[str, Any], app_secret: str) -> bool:
     """使用HMAC-SHA256验证签名。"""

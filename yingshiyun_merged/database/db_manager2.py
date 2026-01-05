@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional, AsyncGenerator
 from contextlib import asynccontextmanager  # 导入异步上下文管理器工具
 import time
 from datetime import datetime, timedelta
-from ziwei_ai_function import VALID_XINGXI_DIZHI_COMBOS
+from utils.ziwei_ai_function import VALID_XINGXI_DIZHI_COMBOS
 
 # import pandas as pd
 

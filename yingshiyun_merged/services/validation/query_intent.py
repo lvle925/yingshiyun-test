@@ -486,3 +486,516 @@ def _close_open_brackets(text: str) -> str:
             closing_sequence += ']'
 
     return text + closing_sequence
+
+
+async def answer_knowledge_question_suggestion(cleaned_question) -> str:
+    """
+    【智慧卡服务专用】对于知识问答类请求，建议用户使用紫薇服务
+    """
+    return f"""您的问题涉及命理专业知识，建议您使用紫微斗数服务获得更专业的解答。
+
+紫微斗数特别适合：
+- 专业术语和概念的详细解释
+- 命盘结构的深入理解
+- 长期运势和人生格局的分析
+
+智慧卡则更擅长：
+- 具体事件的短期预测
+- 实际问题的明确指引
+- 决策建议和行动方向
+
+如果您希望继续询问该问题请转到紫微斗数提问：{cleaned_question}
+"""
+
+async def answer_qimen_suggestion(cleaned_question) -> str:
+    """
+    【智慧卡服务专用】对于奇门类请求，建议用户使用奇门遁甲服务
+    """
+    return f"""您的问题涉及具体择时择事的专业判断，建议您使用奇门遁甲服务获得更专业的解答。
+
+奇门服务则更擅长：
+- 具体时间点的择时分析
+- 通过时间确定适合的事件
+- 通过事件确定适合的时间
+
+智慧卡服务特别适合：
+- 具体事件的短期预测
+- 明确的行动建议和指引
+- 快速决策支持
+- 选择类问题的对比分析
+
+如果您希望继续询问该问题请转到奇门服务提问：{cleaned_question}
+"""
+
+async def answer_self_intro() -> str:
+    """
+    自我介绍回复
+    """
+    return "我是您的AI生活小助手，集传统文化智慧与现代AI技术于一体，为您提供传统万年历解读、每日运势宜忌及日常养生指南。让千年智慧融入您的生活，在虚实之间揭开未来的迷雾。"
+
+async def answer_non_ziwei_system() -> str:
+    """
+    非紫微体系固定回复
+    """
+    return """抱歉，您的问题我无法回答。我是专注于命理运势分析的AI助手，您提出的问题超出了我的服务范围。
+
+我的专长领域包括：
+- 具体事件的短期预测
+- 明确的行动建议和指引
+- 快速决策支持
+- 选择类问题的对比分析
+
+如果您有关于个人运势、命理方面的问题，欢迎随时向我咨询。"""
+
+async def classify_query_intent_with_llm(
+    user_input: str, 
+    async_client: aiohttp.ClientSession, 
+    semaphore: asyncio.Semaphore, 
+    time_duration: str = "long",
+    max_retries: int = 5
+) -> Dict[str, Any]:
+    """
+    使用 LLM 对用户问题的意图进行分类（适配智慧卡服务）。
+    - specific_short_term: 针对具体、短期事件。
+    - general_long_term: 针对宏观、长期问题 (包括择色、择方位、择吉数)。
+    - self_intro: 自我介绍请求。
+    
+    参数:
+        user_input: 用户输入
+        async_client: aiohttp客户端会话
+        semaphore: VLLM并发控制信号量
+        time_duration: 时间跨度类型，"short"表示一个月内，"long"表示一个月以上或未识别到时间范围（默认值）
+        max_retries: 最大重试次数
+    """
+
+    # 为提示词注入当前时间，便于模型判断绝对时间是过去还是未来
+    import datetime as _dt
+
+    current_time_str = _dt.datetime.now().isoformat(sep=" ", timespec="seconds")
+    system_prompt_content = INTENT_PROMPT_TEMPLATE.replace("{current_time}", current_time_str)
+
+    # 将 time_duration 添加到用户输入中（time_duration 现在总是有值，默认为 "long"）
+    user_prompt_content = f"<user_input>{user_input}</user_input>\n<time_duration>{time_duration}</time_duration>"
+
+    payload = {
+        "model": VLLM_MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": system_prompt_content},
+            {"role": "user", "content": user_prompt_content},
+            {"role": "assistant", "content": "{"}
+        ],
+        "temperature": 0.0,
+        "max_tokens": 200,
+        "response_format": {"type": "json_object", "schema": QueryIntent.model_json_schema()}
+    }
+
+    url = f"{VLLM_API_BASE_URL}/chat/completions"
+    last_exception = None
+    headers={
+           "Authorization": f"Bearer {API_KEY}",
+           "Content-Type": "application/json"
+       }
+    for attempt in range(max_retries):
+        logger.info(f"正在尝试进行意图分类 (第 {attempt + 1}/{max_retries} 次)...")
+        try:
+            # 使用传入的async_client和semaphore
+            await asyncio.wait_for(semaphore.acquire(), timeout=VLLM_SLOT_WAIT_TIMEOUT_SECONDS)
+            try:
+                timeout = aiohttp.ClientTimeout(total=VLLM_REQUEST_TIMEOUT_SECONDS)
+                async with async_client.post(url, json=payload, headers =headers,timeout=timeout) as response:
+                    response.raise_for_status()
+                    json_response = await response.json()
+                    content = json_response.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if not content or not content.strip():
+                        raise ValueError("VLLM返回的 content 为空。")
+                    structured_response = _parse_lenient_json(content)
+                validated_model = QueryIntent.model_validate(structured_response)
+                logger.info("用户查询意图分类成功！")
+                return validated_model.model_dump()
+            finally:
+                semaphore.release()
+                
+        except (ValidationError, ValueError) as e:
+            logger.warning(f"意图分类尝试 {attempt + 1} 失败，LLM输出不符合格式。错误: {e}")
+            last_exception = e
+        except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+            logger.error(f"在第 {attempt + 1} 次意图分类尝试中发生网络错误: {e}")
+            last_exception = e
+        except Exception as e:
+            logger.error(f"在第 {attempt + 1} 次意图分类尝试中发生意外错误: {e}", exc_info=True)
+            last_exception = e
+
+        if attempt < max_retries - 1:
+            await asyncio.sleep(0.5)
+
+    logger.error(f"在 {max_retries} 次尝试后，无法有效分类用户查询。最后一次错误: {last_exception}")
+    raise Exception("AI多次尝试仍无法理解您的查询意图，请尝试换一种说法。")
+
+async def get_all_tags_from_db_async(db_pool) -> List[str]:
+    """
+    查询数据库所有标签的类型（异步版本，使用连接池，带 36 小时缓存）
+    数据库表：qimen_interpreted_analysis，字段：具体事项
+    """
+    global _tags_cache_time
+
+    if not db_pool:
+        logger.error("数据库连接池不可用")
+        return []
+
+    async with _tags_cache_lock:
+        now = time()
+        # 命中缓存
+        if _tags_cache and now - _tags_cache_time < _TAGS_TTL_SECONDS:
+            return list(_tags_cache)
+
+        try:
+            async with db_pool.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    query = """
+                        SELECT DISTINCT `具体事项`
+                        FROM qimen_interpreted_analysis
+                        WHERE `具体事项` IS NOT NULL
+                          AND `具体事项` != ''
+                        ORDER BY `具体事项`
+                    """
+                    await cursor.execute(query)
+                    results = await cursor.fetchall()
+                    tags = [row[0] for row in results if row[0]]
+                    logger.info(f"从数据库获取到 {len(tags)} 个奇门具体事项标签")
+                    _tags_cache.clear()
+                    _tags_cache.extend(tags)
+                    _tags_cache_time = now
+                    return list(_tags_cache)
+        except Exception as e:
+            logger.error(f"查询奇门标签失败: {e}", exc_info=True)
+            # 查询失败时，尽量返回已有缓存（如果有）
+            return list(_tags_cache) if _tags_cache else []
+
+async def classify_qimen_with_llm(
+    user_input: str,
+    available_tags: List[str],
+    async_client: aiohttp.ClientSession,
+    semaphore: asyncio.Semaphore,
+    max_retries: int = 5,
+) -> Dict[str, Any]:
+    """
+    使用单独的大模型请求判断用户问题是否属于奇门三种类型，并提取具体事项标签。
+
+    仅用于：判断 is_qimen / qimen_type / matched_tag。
+    """
+    if not available_tags:
+        logger.warning("奇门识别：可用的具体事项标签列表为空，将直接返回非奇门。")
+        return {"is_qimen": False, "qimen_type": None, "matched_tag": None, "reason": "无可用具体事项标签"}
+
+    # 为避免 format 与 JSON 花括号冲突，这里只做占位符替换
+    import datetime as _dt
+
+    tags_text = json.dumps(available_tags, ensure_ascii=False)
+    current_time_str = _dt.datetime.now().isoformat(sep=" ", timespec="seconds")
+    system_prompt_content = (
+        QIMEN_PROMPT_TEMPLATE.replace("{tags_text}", tags_text).replace("{current_time}", current_time_str)
+    )
+
+    user_prompt_content = f"""
+    <user_input>{user_input}</user_input>
+
+    <AVAILABLE_TAGS_JSON>
+    {json.dumps(available_tags, ensure_ascii=False)}
+    </AVAILABLE_TAGS_JSON>
+    """
+
+    payload = {
+        "model": VLLM_MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": system_prompt_content},
+            {"role": "user", "content": user_prompt_content},
+            {"role": "assistant", "content": "{"},
+        ],
+        "temperature": 0.0,
+        "max_tokens": 200,
+        "response_format": {"type": "json_object", "schema": QimenExtraction.model_json_schema()},
+    }
+
+    url = f"{VLLM_API_BASE_URL}/chat/completions"
+    last_exception: Optional[Exception] = None
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    for attempt in range(max_retries):
+        logger.info(f"正在尝试进行奇门类型识别 (第 {attempt + 1}/{max_retries} 次)...")
+        try:
+            await asyncio.wait_for(semaphore.acquire(), timeout=VLLM_SLOT_WAIT_TIMEOUT_SECONDS)
+            try:
+                timeout = aiohttp.ClientTimeout(total=VLLM_REQUEST_TIMEOUT_SECONDS)
+                async with async_client.post(url, json=payload, headers=headers, timeout=timeout) as response:
+                    response.raise_for_status()
+                    json_response = await response.json()
+                    content = json_response.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if not content or not content.strip():
+                        raise ValueError("VLLM返回的奇门识别 content 为空。")
+                    structured_response = _parse_lenient_json(content)
+                validated_model = QimenExtraction.model_validate(structured_response)
+                logger.info("奇门类型识别成功！")
+                return validated_model.model_dump()
+            finally:
+                semaphore.release()
+
+        except (ValidationError, ValueError) as e:
+            logger.warning(f"奇门类型识别尝试 {attempt + 1} 失败，LLM输出不符合格式。错误: {e}")
+            last_exception = e
+        except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+            logger.error(f"在第 {attempt + 1} 次奇门类型识别尝试中发生网络错误: {e}")
+            last_exception = e
+        except Exception as e:
+            logger.error(f"在第 {attempt + 1} 次奇门类型识别尝试中发生意外错误: {e}", exc_info=True)
+            last_exception = e
+
+        if attempt < max_retries - 1:
+            await asyncio.sleep(0.5)
+
+    logger.error(f"在 {max_retries} 次尝试后，无法有效完成奇门识别。最后一次错误: {last_exception}")
+    # 奇门识别失败时，不要中断主流程，按“非奇门”处理
+    return {"is_qimen": False, "qimen_type": None, "matched_tag": None, "reason": "奇门识别失败，按非奇门处理"}
+
+
+# 注意：原有的aiohttp_vllm_invoke_text函数也已被移除
+
+def is_historical_time(time_range_result: Dict[str, Any]) -> bool:
+    """
+    判断识别到的时间范围是否为历史时间。
+    
+    规则：如果时间范围的结束日期小于当前日期，则认为是历史时间。
+    
+    参数:
+        time_range_result: detect_time_range_with_llm 返回的结果
+        
+    返回:
+        True: 是历史时间
+        False: 不是历史时间（未来时间或无法判断）
+    """
+    import datetime as _dt
+    
+    if not time_range_result.get("has_time_range"):
+        return False
+    
+    end_date_str = time_range_result.get("end_date")
+    if not end_date_str:
+        return False
+    
+    try:
+        # 解析结束日期
+        end_date = _dt.datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        current_date = _dt.date.today()
+        
+        # 如果结束日期小于当前日期，认为是历史时间
+        is_historical = end_date < current_date
+        logger.info(f"时间范围判断: 结束日期={end_date_str}, 当前日期={current_date.isoformat()}, 是否为历史时间={is_historical}")
+        return is_historical
+    except ValueError as e:
+        logger.warning(f"无法解析时间范围结束日期 '{end_date_str}': {e}")
+        return False
+    
+
+#===============================奇门配置=========================================
+async def classify_second_layer_intent(
+    user_input: str,
+    available_tags: list,
+    current_time: str,
+    async_client: aiohttp.ClientSession,
+    semaphore: asyncio.Semaphore,
+    max_retries: int = 5
+) -> Dict[str, Any]:
+    """
+    第二层意图识别: 判断奇门问题的具体类型并提取时间和事件
+    
+    需要从数据库中查询所有标签类型，传递给大模型进行匹配
+    """
+    
+    # 从XML文件加载提示词
+    template = get_qimen_type_prompt_template()
+    if not template:
+        raise Exception("无法加载奇门类型分类提示词模板")
+    
+    tags_text = "\n".join([f"- {tag}" for tag in available_tags])
+    system_prompt = (
+        template
+        .replace("{available_tags}", tags_text)
+        .replace("{current_time}", current_time)
+    )
+
+    user_prompt = f"""
+    <user_input>{user_input}</user_input>
+
+    <AVAILABLE_TAGS_JSON>
+    {json.dumps(available_tags, ensure_ascii=False)}
+    </AVAILABLE_TAGS_JSON>
+    """
+    
+    payload = {
+        "model": VLLM_MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+            {"role": "assistant", "content": "{"}
+        ],
+        "temperature": 0.0,
+        "max_tokens": 500,
+        "response_format": {"type": "json_object"}
+    }
+    
+    url = f"{VLLM_API_BASE_URL}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        logger.info(f"正在尝试进行第二层意图分类 (第 {attempt + 1}/{max_retries} 次)...")
+        try:
+            await asyncio.wait_for(semaphore.acquire(), timeout=1500)
+            try:
+                timeout = aiohttp.ClientTimeout(total=500)
+                async with async_client.post(url, json=payload, headers=headers, timeout=timeout) as response:
+                    response.raise_for_status()
+                    json_response = await response.json()
+                    content = json_response.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if not content or not content.strip():
+                        raise ValueError("VLLM返回的 content 为空。")
+                    structured_response = _parse_lenient_json(content)
+                    validated_model = SecondLayerIntent.model_validate(structured_response)
+                    logger.info("第二层用户查询意图分类成功！")
+                    return validated_model.model_dump()
+            finally:
+                semaphore.release()
+                
+        except (ValueError, ValidationError, Exception) as e:
+            logger.warning(f"第二层意图分类尝试 {attempt + 1} 失败: {e}")
+            last_exception = e
+        
+        if attempt < max_retries - 1:
+            await asyncio.sleep(0.5)
+    
+    logger.error(f"在 {max_retries} 次尝试后，无法有效分类用户查询。最后一次错误: {last_exception}")
+    raise Exception("AI多次尝试仍无法理解您的查询意图，请尝试换一种说法。")
+
+
+async def extract_time_range_with_llm(
+    user_input: str,
+    async_client: aiohttp.ClientSession,
+    semaphore: asyncio.Semaphore,
+    max_retries: int = 5
+) -> Dict[str, Any]:
+    """
+    使用 LLM 从用户问题中提取时间范围。
+    
+    参数:
+        user_input: 用户输入
+        async_client: aiohttp客户端会话
+        semaphore: VLLM并发控制信号量
+        max_retries: 最大重试次数
+    """
+    
+    # 从XML文件加载提示词
+    system_prompt_content = get_time_range_prompt_template()
+    if not system_prompt_content:
+        raise Exception("无法加载时间范围识别提示词模板")
+    
+    # 为大模型提供当前日期（格式：YYYY-MM-DD）
+    current_date_str = datetime.now().strftime("%Y-%m-%d")
+    
+    user_prompt_content = (
+        f"<current_date>{current_date_str}</current_date>\n"
+        f"<user_input>{user_input}</user_input>"
+    )
+    
+    payload = {
+        "model": VLLM_MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": system_prompt_content},
+            {"role": "user", "content": user_prompt_content},
+            {"role": "assistant", "content": "{"}
+        ],
+        "temperature": 0.0,
+        "max_tokens": 300,
+        "response_format": {"type": "json_object", "schema": TimeRangeExtraction.model_json_schema()}
+    }
+    
+    url = f"{VLLM_API_BASE_URL}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        logger.info(f"正在尝试进行时间范围提取 (第 {attempt + 1}/{max_retries} 次)...")
+        try:
+            await asyncio.wait_for(semaphore.acquire(), timeout=VLLM_SLOT_WAIT_TIMEOUT_SECONDS)
+            try:
+                timeout = aiohttp.ClientTimeout(total=VLLM_REQUEST_TIMEOUT_SECONDS)
+                async with async_client.post(url, json=payload, headers=headers, timeout=timeout) as response:
+                    response.raise_for_status()
+                    json_response = await response.json()
+                    content = json_response.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if not content or not content.strip():
+                        raise ValueError("VLLM返回的 content 为空。")
+                    structured_response = _parse_lenient_json(content)
+                    validated_model = TimeRangeExtraction.model_validate(structured_response)
+                    logger.info("时间范围提取成功！")
+                    return validated_model.model_dump()
+            finally:
+                semaphore.release()
+                
+        except (ValidationError, ValueError) as e:
+            logger.warning(f"时间范围提取尝试 {attempt + 1} 失败，LLM输出不符合格式。错误: {e}")
+            last_exception = e
+        except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+            logger.error(f"在第 {attempt + 1} 次时间范围提取尝试中发生网络错误: {e}")
+            last_exception = e
+        except Exception as e:
+            logger.error(f"在第 {attempt + 1} 次时间范围提取尝试中发生意外错误: {e}", exc_info=True)
+            last_exception = e
+        
+        if attempt < max_retries - 1:
+            await asyncio.sleep(0.5)
+    
+    logger.error(f"在 {max_retries} 次尝试后，无法有效提取时间范围。最后一次错误: {last_exception}")
+    # 如果提取失败，返回默认值（表示没有时间信息，默认返回长时间）
+    return {
+        "has_time_range": False,
+        "end_date": None,
+        "time_expression": None,
+        "time_duration_type": "long",
+        "reason": "时间范围提取失败，默认返回长时间（long）"
+    }
+
+def start_prompt_file_watcher():
+    """
+    启动提示词文件监控（支持热更新）
+    注意：需要 watchdog 库支持
+    """
+    try:
+        from watchdog.observers import Observer
+        from watchdog.events import FileSystemEventHandler
+        
+        class PromptFileHandler(FileSystemEventHandler):
+            def on_modified(self, event):
+                if event.src_path.endswith('.xml'):
+                    logger.info(f"检测到提示词文件变化: {event.src_path}")
+                    reload_prompt_templates()
+        
+        observer = Observer()
+        event_handler = PromptFileHandler()
+        observer.schedule(event_handler, path=str(_prompts_dir), recursive=False)
+        observer.start()
+        logger.info(f"✓ 提示词文件监控已启动，监控目录: {_prompts_dir.absolute()}")
+        return observer
+    except ImportError:
+        logger.warning("未安装 watchdog 库，热更新功能不可用。修改提示词需要重启服务。")
+        return None
+    except Exception as e:
+        logger.error(f"启动提示词文件监控失败: {e}", exc_info=True)
+        return None

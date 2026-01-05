@@ -28,10 +28,10 @@ from config import (
     TRADITIONAL_HOUR_TO_TIME_INDEX,
     VLLM_MODEL_NAME,
 )
-from models import SignableAPIRequest
-from monitoring import REQUESTS_RECEIVED
-from services.monitor import StepMonitor, log_step, generate_request_id
-from .session_manager import get_session_history, get_user_analysis_data, store_user_analysis_data
+from .models import SignableAPIRequest
+from monitoring.monitor import REQUESTS_RECEIVED
+from monitoring.monitor import StepMonitor, log_step, generate_request_id
+from services.session.session_manager import get_session_history, get_user_analysis_data, store_user_analysis_data
 from clients.vllm_client import (
     extract_birth_info_with_llm,
     check_multi_time_analysis,
@@ -42,7 +42,7 @@ from clients.vllm_client import (
 )
 from clients.external_api_client import robust_api_call_with_retry
 from .ziwei_analyzer import generate_ziwei_analysis, generate_horoscope_analysis
-from utils import (
+from utils.utils_ziwei import (
     calculate_next_decadal_start_year,
     get_current_decadal_start_year,
     get_lunar_month_range_string,
@@ -57,14 +57,14 @@ from utils import (
     extract_decadal_age_range_from_api_response,
     get_lunar_day_string,
 )
-from .validation_rules import (
+from services.validation.validation_rules import (
     is_gibberish,
     detect_critical_time_selection,
     detect_sensitive_political_content,
     detect_age_inquiry,
     detect_finance_or_lottery,
 )
-from .queryIntent import (
+from services.validation.query_intent import (
     classify_query_intent_with_llm,
     detect_time_range_with_llm,
     answer_knowledge_question,
@@ -78,7 +78,7 @@ from .chat_time_utils import (
     is_birth_info_complete,
     calculate_lunar_age,
 )
-from prompt_logic import response_string_capability
+from prompts.prompt_logic import response_string_capability
 
 logger = logging.getLogger(__name__)
 

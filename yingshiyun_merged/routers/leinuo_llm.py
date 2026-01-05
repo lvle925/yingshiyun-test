@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 import logging
 
 from schemas.leinuo_llm import LeinuoLLMRequest
-from services.leinuo import llm_service
+from services.leinuo import leinuo_llm_service as llm_service
 
 logger = logging.getLogger(__name__)
 

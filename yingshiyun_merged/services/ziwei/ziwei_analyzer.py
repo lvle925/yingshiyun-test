@@ -7,13 +7,13 @@ from database import db_manager # 假设 db_manager 在项目根目录或 PYTHON
 import copy
 import json
 # 导入您本地的辅助函数
-from tiangan_function import parse_bazi_components, replace_key_names, key_mapping, zhuxing1, ziweids2, describe_ziwei_chart
-from liushifunction import key_translation_map, value_translation_map, translate_json, sihua, zhuxing, ziweids_conzayao
-from ziwei_ai_function import transform_horoscope_scope_data, transform_palace_data
+from utils.tiangan_function import parse_bazi_components, replace_key_names, key_mapping, zhuxing1, ziweids2, describe_ziwei_chart
+from utils.liushifunction import key_translation_map, value_translation_map, translate_json, sihua, zhuxing, ziweids_conzayao
+from utils.ziwei_ai_function import transform_horoscope_scope_data, transform_palace_data
 from config import ALL_PALACES, TRADITIONAL_HOUR_TO_TIME_INDEX, DIZHI_DUIGONG_MAP, MISSING_BIRTH_INFO_MESSAGE
-from utils import parse_chart_description_block,calculate_score_by_rules, parse_palace_data
+from utils.utils_ziwei import parse_chart_description_block,calculate_score_by_rules, parse_palace_data
 
-from ziwei_ai_function import transform_horoscope_scope_data, ALL_EARTHLY_BRANCHES, FIXED_PALACE_ORDER_FOR_SCOPES, \
+from utils.ziwei_ai_function import transform_horoscope_scope_data, ALL_EARTHLY_BRANCHES, FIXED_PALACE_ORDER_FOR_SCOPES, \
     HEAVENLY_STEM_MUTAGEN_MAP, get_ordered_palace_branches, get_mutagen_for_stem, transform_palace_data, \
     _parse_lenient_json, \
     _extract_first_json_object, _close_open_brackets, simple_clean_birth_info, simple_clean_query_intent, \

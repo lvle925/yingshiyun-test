@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from time import time
 from starlette.concurrency import run_in_threadpool
 from config import DB_CONFIG
-from user_info_extractor import get_day_stem_from_gregorian_date
+from .user_info_extractor import get_day_stem_from_gregorian_date
 
 logger = logging.getLogger(__name__)
 

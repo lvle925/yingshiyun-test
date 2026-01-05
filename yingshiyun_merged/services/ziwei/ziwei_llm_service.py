@@ -10,16 +10,17 @@ from starlette.responses import StreamingResponse, JSONResponse
 from prometheus_client import make_asgi_app
 
 # 模块化导入
-from config import APP_SECRET  # 检查配置
-from models import SignableAPIRequest
+from services.session.session_manager import *
+from .chat_processor import *
+from config import APP_SECRETS as APP_SECRET # 检查配置
+from .models import SignableAPIRequest
 from security.verifier import signature_verifier
-from monitoring import REQUESTS_RECEIVED
+from monitoring.monitor import REQUESTS_RECEIVED
 from database import  db_manager
 from clients import external_api_client, vllm_client
-from services import session_manager, chat_processor
 from clients import shared_client
 from fastapi.middleware.cors import CORSMiddleware
-from services.monitor import StepMonitor, log_step, generate_request_id
+from monitoring.monitor import StepMonitor, log_step, generate_request_id
 
 # 【新增】热更新相关导入
 import asyncio
@@ -155,19 +156,19 @@ class PromptsFileMonitor:
 
 # --- FastAPI 应用 ---
 # FastAPI app 已移至 main.py",
-    description="一个使用aiohttp进行底层HTTP请求，实现高性能、高并发、模块化的AI接口。",
-    version="3.0.0"
-)
+    #description="一个使用aiohttp进行底层HTTP请求，实现高性能、高并发、模块化的AI接口。",
+    #version="3.0.0"
+#)
 
 # CORS 已在 main.py 配置
 
 # 挂载 Prometheus 指标路由
 metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
+#app.mount("/metrics", metrics_app)
 
 
 # 全局异常处理器 - 记录非200状态码
-@app.exception_handler(HTTPException)
+#@app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """处理 HTTPException，记录非200状态码到监控日志"""
     request_id = getattr(request.state, "request_id", None) or generate_request_id()
@@ -193,7 +194,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-@app.exception_handler(Exception)
+#@app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """处理所有未捕获的异常"""
     request_id = getattr(request.state, "request_id", None) or generate_request_id()
@@ -218,7 +219,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.on_event("startup")
+#@app.on_event("startup")
 async def startup_event():
     """应用启动时，初始化所有必要的模块。"""
     logger.info("应用启动，开始初始化所有服务...")
@@ -251,7 +252,7 @@ async def startup_event():
     logger.info("所有服务初始化完毕。")
 
 
-@app.on_event("shutdown")
+# @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭时，清理所有资源。"""
     logger.info("应用关闭，开始清理所有服务...")
@@ -267,7 +268,7 @@ async def shutdown_event():
     logger.info("所有服务清理完毕。")
 
 
-@app.post("/chat_yingshis_V12_25", summary="发送聊天消息 (流式 & 签名验证)")
+# @app.post("/chat_yingshis_V12_25", summary="发送聊天消息 (流式 & 签名验证)")
 async def chat(request: Request, validated_body: dict = Depends(signature_verifier)):
 
     """
@@ -297,10 +298,3 @@ async def chat(request: Request, validated_body: dict = Depends(signature_verifi
         ),
         media_type="text/plain; charset=utf-8"
     )
-
-
-if __name__ == "__main__":
-    print("\n--- 启动说明---")
-    print("uvicorn api_main:app --host 0.0.0.0 --port 8044 --reload")
-
-    uvicorn.run("api_main:app", host="0.0.0.0", port=8044, reload=True)

@@ -5,6 +5,19 @@
 #   - 为选择类问题（如“买A还是B”）提供全新的、基于多牌阵对比的解读逻辑和输出格式。
 #   - 重构了抽牌和提示词生成逻辑，以支持两种不同的问题类型。
 
+import sys
+import os
+
+# 获取当前文件的目录 (即 .../services/leinuo)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 获取项目根目录 (往上退两级: leinuo -> services -> yingshiyun_merged)
+project_root = os.path.dirname(os.path.dirname(current_dir))
+
+# 将项目根目录添加到 python 搜索路径中
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import asyncio
 import aiohttp
 import openai
@@ -106,7 +119,7 @@ def generate_signature(params: Dict[str, Any], app_secret: str) -> str:
 
 
 # --- 应用启动和关闭事件 (保持不变) ---
-@app.on_event("startup")
+#@app.on_event("startup")
 async def startup_event():
     global async_aiohttp_client, vllm_semaphore
     logger.info("FastAPI 应用启动中...")
@@ -150,7 +163,7 @@ async def startup_event():
     logger.info("FastAPI 应用启动完成。")
 
 
-@app.on_event("shutdown")
+# @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("FastAPI 应用关闭中...")
     

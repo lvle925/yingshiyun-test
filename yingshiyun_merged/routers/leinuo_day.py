@@ -5,7 +5,7 @@ import hashlib
 import logging
 
 from schemas.leinuo import DivinationRequest
-from services.leinuo import day_service
+from services.leinuo import leinuo_day_service as day_service
 from config import APP_SECRETS
 
 logger = logging.getLogger(__name__)

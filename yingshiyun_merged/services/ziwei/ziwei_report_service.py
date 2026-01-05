@@ -17,7 +17,7 @@ import random
 import pandas as pd
 import requests
 import aiohttp
-from tokenizer import count_tokens_for_messages, count_tokens_for_string
+from utils.tokenizer import count_tokens_for_messages, count_tokens_for_string
 from typing import Tuple, Dict, Any, AsyncGenerator
 from collections import defaultdict
 from urllib.parse import urlparse
@@ -26,54 +26,27 @@ import calendar
 from lunardate import LunarDate
 from fastapi import FastAPI, HTTPException, Depends, Body
 from pydantic import BaseModel, Field, ValidationError, field_validator
-from prometheus_client import Counter, make_asgi_app
-import prometheus_client
+from utils.metrics import REQUESTS_RECEIVED, VLLM_REQUESTS_SENT_ATTEMPTS, VLLM_RESPONSES_SUCCESS, VLLM_RESPONSES_FAILED
 from monitor import StepMonitor, log_step, generate_request_id, monitor_logger
+from database import db_manager2  as db_manager
 
-import db_manager2 as db_manager
 
 # --- 本地辅助函数导入 (假设这些文件存在) ---
-from tiangan_function import parse_bazi_components, replace_key_names, key_mapping, ziweids2, \
+from utils.tiangan_function import parse_bazi_components, replace_key_names, key_mapping, ziweids2, \
     describe_ziwei_chart
-from liushifunction import key_translation_map, value_translation_map, translate_json, zhuxing, ziweids_conzayao
+from utils.liushifunction import key_translation_map, value_translation_map, translate_json, zhuxing, ziweids_conzayao
 
-from ziwei_ai_function import transform_horoscope_scope_data, transform_palace_data_new, \
+from utils.ziwei_ai_function import transform_horoscope_scope_data, transform_palace_data_new, \
     DI_ZHI_ORDER, DIZHI_DUIGONG_MAP, TRADITIONAL_HOUR_TO_TIME_INDEX, transform_palace_data, \
     parse_palace_data, calculate_score_by_rules, get_lunar_month_range_string, \
     get_judgment_word_bank_for_score, generate_score_based_judgment, _parse_lenient_json
 
-from xingyaoxingzhi import preprocess_chart, analyze_chart_final_optimized, PALACE_ORDER, perform_astrological_analysis
+from utils.xingyaoxingzhi import preprocess_chart, analyze_chart_final_optimized, PALACE_ORDER, perform_astrological_analysis
 
-from utils import (
+from utils.utils import (
     calculate_time_index,
 )
 
-
-# --- 日志配置 ---
-prometheus_client.REGISTRY.unregister(prometheus_client.GC_COLLECTOR)
-prometheus_client.REGISTRY.unregister(prometheus_client.PLATFORM_COLLECTOR)
-prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
-
-REQUESTS_RECEIVED = Counter(
-    "api_requests_received_total",
-    "Total number of requests received at the /chat_year endpoint."
-)
-
-VLLM_REQUESTS_SENT_ATTEMPTS = Counter(
-    "vllm_requests_sent_attempts_total",
-    "Total attempts to send requests to VLLM after acquiring the semaphore."
-)
-
-VLLM_RESPONSES_SUCCESS = Counter(
-    "vllm_responses_success_total",
-    "Total number of successful and complete responses from VLLM."
-)
-
-VLLM_RESPONSES_FAILED = Counter(
-    "vllm_responses_failed_total",
-    "Total number of failed/errored responses from VLLM.",
-    ["reason"]
-)
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))  # 默认INFO，若需更详细日志可设为DEBUG
 logger = logging.getLogger(__name__)
@@ -1570,9 +1543,9 @@ def generate_default_fortune_review(target_year: int, top_palaces_info: list, bo
 
 # --- FastAPI 应用 ---
 # FastAPI app 已移至 main.py",
-    description="一个针对固定输入格式和年度报告需求的优化版AI接口。",
-    version="1.0.0"
-)
+    #description="一个针对固定输入格式和年度报告需求的优化版AI接口。",
+    #version="1.0.0"
+#)
 
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
@@ -1806,8 +1779,4 @@ async def chat_year(request_body: dict = Body(...)):
                 logger.error(f"更新用量统计时发生错误: {e}", exc_info=True)
 
 
-if __name__ == "__main__":
-    print("\n--- 启动说明 ---")
-    print("uvicorn api_main:app --host 0.0.0.0 --port 7079 --reload")
 
-    uvicorn.run("api_main:app", host="0.0.0.0", port=7079, reload=True)
