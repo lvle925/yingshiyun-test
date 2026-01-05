@@ -226,10 +226,7 @@ def translate_json_keys(data, translation_map):
 
 
 
-app = FastAPI(
-    title="紫微斗数年运势评分 API",
-    description="输入出生日期和年份范围，生成各年的宫位分数和综合评分。"
-)
+# FastAPI app 已移至 main.py
 
 
 class YearlyAnalysisRequest(BaseModel):
@@ -263,8 +260,7 @@ async def shutdown_event():
 
 
 
-@app.post("/yearFortuneScore", summary="生成年度运势评分")
-async def generate_yearly_scores(request: YearlyAnalysisRequest):
+async def process_year_score(request: YearlyAnalysisRequest):
     """ 
     根据指定的出生年月日时、性别和年份，生成各维度的年度分数和月度分数。
     只返回分数数据，不包含LLM建议。

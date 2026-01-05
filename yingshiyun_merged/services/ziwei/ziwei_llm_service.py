@@ -154,18 +154,12 @@ class PromptsFileMonitor:
 
 
 # --- FastAPI 应用 ---
-app = FastAPI(
-    title="紫微斗数AI API (模块化高性能版)",
+# FastAPI app 已移至 main.py",
     description="一个使用aiohttp进行底层HTTP请求，实现高性能、高并发、模块化的AI接口。",
     version="3.0.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # 或明确写上 "http://192.168.1.101:5500"
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS 已在 main.py 配置
 
 # 挂载 Prometheus 指标路由
 metrics_app = make_asgi_app()

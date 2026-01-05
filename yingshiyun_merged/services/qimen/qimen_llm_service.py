@@ -23,19 +23,19 @@ from langchain_core.messages import HumanMessage, AIMessage
 from starlette.concurrency import run_in_threadpool
 
 from config import VLLM_API_BASE_URL, VLLM_MODEL_NAME, API_KEY, DB_CONFIG
-from app.monitor import StepMonitor, log_step, generate_request_id
-from session_manager import initialize_session_manager, close_session_manager, get_session_history
-from validation_rules import is_gibberish, detect_critical_time_selection, detect_sensitive_political_content, detect_finance_investment
-from user_info_extractor import extract_user_info, get_day_stem_from_gregorian_date
-from query_intent import (
+from monitoring.monitor import StepMonitor, log_step, generate_request_id
+from services.session.session_manager import initialize_session_manager, close_session_manager, get_session_history
+from services.validation.validation_rules import is_gibberish, detect_critical_time_selection, detect_sensitive_political_content, detect_finance_investment
+from services.qimen.user_info_extractor import extract_user_info, get_day_stem_from_gregorian_date
+from services.validation.query_intent import (
     classify_query_intent_with_llm, 
     classify_second_layer_intent, 
     answer_knowledge_question_suggestion,
     extract_time_range_with_llm,
     start_prompt_file_watcher as start_intent_prompt_watcher
 )
-from db_query import get_all_tags_from_db_async, query_qimen_data
-from llm_response import generate_final_response, start_prompt_file_watcher
+from services.qimen.db_query import get_all_tags_from_db_async, query_qimen_data
+from services.llm.llm_response import generate_final_response, start_prompt_file_watcher
 import aiomysql
 
 # --- 日志配置 ---
@@ -54,14 +54,9 @@ APP_SECRETS: Dict[str, str] = {
     "test_app": "test_secret_key"
 }
 
-app = FastAPI()
+# FastAPI app 已移至 main.py
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS 已在 main.py 配置
 
 async_aiohttp_client: Optional[aiohttp.ClientSession] = None
 VLLM_CONCURRENT_LIMIT = 200
@@ -501,8 +496,7 @@ async def save_history_async(history_manager, user_question: str, ai_response: s
 
 
 # --- FastAPI 接口端点 ---
-@app.post("/chat_qimen")
-async def chat_endpoint(client_request: ClientRequest, request: Request):
+async def process_qimen_llm_chat(client_request: ClientRequest, request: Request):
     request_start_time = time.perf_counter()
     req_id = client_request.session_id or generate_request_id()
     log_step(

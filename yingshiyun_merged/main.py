@@ -34,28 +34,28 @@ app.add_middleware(
 # ==================== 导入路由 ====================
 # 注意: 这些导入需要在实际创建路由文件后取消注释
 
-from routers import leinuo_day
-# from routers import leinuo_llm
-# from routers import ziwei_llm, ziwei_report, ziwei_year
-# from routers import year_score, summary
+from routers import leinuo_day, leinuo_llm
+from routers import qimen_day, qimen_llm
+from routers import ziwei_llm, ziwei_report, ziwei_year
+from routers import year_score, summary
 
 # ==================== 注册路由 ====================
 # 雷诺相关路由
 app.include_router(leinuo_day.router, tags=["雷诺每日运势"])
-# app.include_router(leinuo_llm.router, prefix="/leinuo/llm", tags=["LLM雷诺"])
+app.include_router(leinuo_llm.router, tags=["LLM雷诺"])
 
 # 奇门相关路由
-# app.include_router(qimen_day.router, prefix="/qimen/day", tags=["奇门每日运势"])
-# app.include_router(qimen_llm.router, prefix="/qimen/llm", tags=["LLM奇门"])
+app.include_router(qimen_day.router, tags=["奇门择日"])
+app.include_router(qimen_llm.router, tags=["LLM奇门"])
 
 # 紫微相关路由
-# app.include_router(ziwei_llm.router, prefix="/ziwei/llm", tags=["LLM紫微"])
-# app.include_router(ziwei_report.router, prefix="/ziwei/report", tags=["紫微报告"])
-# app.include_router(ziwei_year.router, prefix="/ziwei/year", tags=["紫微年度报告"])
+app.include_router(ziwei_llm.router, tags=["LLM紫微"])
+app.include_router(ziwei_report.router, tags=["紫微报告"])
+app.include_router(ziwei_year.router, tags=["紫微年度报告"])
 
 # 其他路由
-# app.include_router(year_score.router, prefix="/year/score", tags=["年运势评分"])
-# app.include_router(summary.router, prefix="/summary", tags=["总结"])
+app.include_router(year_score.router, tags=["年运势评分"])
+app.include_router(summary.router, tags=["总结服务"])
 
 # ==================== 健康检查端点 ====================
 @app.get("/health")

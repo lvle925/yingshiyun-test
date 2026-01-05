@@ -1569,8 +1569,7 @@ def generate_default_fortune_review(target_year: int, top_palaces_info: list, bo
 
 
 # --- FastAPI 应用 ---
-app = FastAPI(
-    title="紫微斗数AI年度报告API (优化版)",
+# FastAPI app 已移至 main.py",
     description="一个针对固定输入格式和年度报告需求的优化版AI接口。",
     version="1.0.0"
 )

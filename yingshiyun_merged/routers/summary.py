@@ -2,18 +2,18 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import logging
 
-from schemas.qimen import QimenLLMRequest
-from services.qimen import qimen_llm_service
+from schemas.summary import SummaryRequest
+from services.summary import summary_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/chat_qimen", summary="奇门LLM对话")
-async def chat_qimen(client_request: QimenLLMRequest, request: Request):
-    """奇门LLM对话接口"""
+@router.post("/unified_chat_V12_25", summary="统一对话服务")
+async def unified_chat(client_request: SummaryRequest, request: Request):
+    """统一对话服务接口"""
     try:
-        stream_generator = await qimen_llm_service.process_qimen_llm_chat(client_request, request)
+        stream_generator = await summary_service.process_summary(client_request, request)
         return stream_generator
     except HTTPException as he:
         raise he

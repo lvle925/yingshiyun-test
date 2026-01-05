@@ -57,7 +57,7 @@ from config import (
     DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_POOL_SIZE, DB_MAX_OVERFLOW
 )
 
-from validation_rules import (
+from services.validation.validation_rules import (
     detect_illegal_content,
     is_gibberish,
     detect_critical_time_selection,
@@ -69,7 +69,7 @@ from validation_rules import (
 )
 
 # 导入session_manager
-from session_manager import (
+from services.session.session_manager import (
     initialize_session_manager, 
     close_session_manager,
     get_session_history,
@@ -133,17 +133,12 @@ APP_SECRETS: Dict[str, str] = {
 
 renomann_cards_df: Optional[pd.DataFrame] = None
 renomann_meanings_df: Optional[pd.DataFrame] = None
-app = FastAPI()
+# FastAPI app 已移至 main.py
 VLLM_CONCURRENT_LIMIT = 100
 vllm_semaphore: Optional[asyncio.Semaphore] = None
 next_request_id_counter = 0
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # 或明确写上 "http://192.168.1.101:5500"
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS 已在 main.py 配置
 
 # --- Pydantic 请求模型 (保持不变) ---
 class UnifiedChatRequest(BaseModel):
@@ -750,8 +745,7 @@ async def stream_response_with_history(
 # =============================================================================
 # === Core Modification: Updated Unified Chat Endpoint ===
 # =============================================================================
-@app.post("/unified_chat_V12_25")
-async def unified_chat(request: Request,request_body: UnifiedChatRequest):
+async def process_summary(request: Request,request_body: UnifiedChatRequest):
     """
     统一聊天接口，通过前置规则和LLM意图分析，智能决定调用哪个下游服务。
     这个版本手动接收原始请求体，并仅修复换行符问题。

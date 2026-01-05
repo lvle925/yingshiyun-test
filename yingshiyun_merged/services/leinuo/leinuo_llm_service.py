@@ -24,26 +24,26 @@ from datetime import datetime, timedelta, date
 from datetime import date, datetime
 from typing import Optional, List, AsyncGenerator, Dict, Any
 from fastapi import FastAPI, HTTPException, Request, status
-from prompt_logic import generate_non_choice_prompt, generate_choice_prompt, _draw_and_get_card_data
+from prompts.prompt_logic import generate_non_choice_prompt, generate_choice_prompt, _draw_and_get_card_data
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, validator
+from schemas.leinuo_llm import LeinuoLLMRequest as ClientRequest
 from langchain_core.messages import HumanMessage, AIMessage
 from fastapi.middleware.cors import CORSMiddleware
-from config import VLLM_API_BASE_URL,VLLM_MODEL_NAME,DB_CONFIG,API_KEY
-from app.monitor import StepMonitor, log_step, generate_request_id
+from config import VLLM_API_BASE_URL, VLLM_MODEL_NAME, DB_CONFIG, API_KEY, APP_SECRETS
+from monitoring.monitor import StepMonitor, log_step, generate_request_id
 
 
 # 导入session_manager
-from session_manager import initialize_session_manager, close_session_manager, get_session_history
+from services.session.session_manager import initialize_session_manager, close_session_manager, get_session_history
 
 # 导入验证规则和意图识别
-from validation_rules import (
+from services.validation.validation_rules import (
     is_gibberish,
     detect_critical_time_selection,
     detect_sensitive_political_content,
     detect_finance_or_lottery,
 )
-from queryIntent import (
+from services.validation.query_intent import (
     answer_knowledge_question_suggestion,
     answer_qimen_suggestion,
     answer_self_intro,
@@ -68,10 +68,7 @@ db_pool: Optional[aiomysql.Pool] = None  # 【新增】数据库连接池的全�
 
 
 # --- 签名密钥配置 ---
-APP_SECRETS: Dict[str, str] = {
-    "yingshi_appid": "zhongzhoullm",
-    "test_app": "test_secret_key"
-}
+# APP_SECRETS 已从 config 导入
 
 # --- CSV 数据文件路径 ---
 # 使用相对于当前文件所在目录的绝对路径，避免工作目录变化导致找不到文件
@@ -82,14 +79,9 @@ MEANINGS_CSV_PATH = os.path.join(BASE_DIR, '雷牌信息集合.csv')
 renomann_cards_df: Optional[pd.DataFrame] = None
 renomann_meanings_df: Optional[pd.DataFrame] = None
 
-app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # 或明确写上 "http://192.168.1.101:5500"
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+
 
 async_aiohttp_client: Optional[aiohttp.ClientSession] = None
 VLLM_CONCURRENT_LIMIT = 200
@@ -99,36 +91,6 @@ next_request_id_counter = 0
 
 
 # --- Pydantic 请求模型 (保持不变) ---
-class ClientRequest(BaseModel):
-    appid: str = Field(..., description="应用ID")
-    prompt: str = Field(..., description="用户的问题，将用于生成LLM提示词")
-    format: str = Field("json", description="响应格式，默认为json")
-    ftime: int = Field(..., description="时间戳 (整数)，用于签名验证")
-    sign: str = Field(..., description="请求签名，用于验证请求完整性")
-    session_id: Optional[str] = Field(None, description="会话ID")
-    hl_ymd: Optional[str] = Field(None, description="可选的日期参数")
-    skip_intent_check: int = Field(0, description="是否跳过意图识别，0=不跳过（默认），1=跳过直接进行智慧卡占卜")
-    card_number_pool: Optional[List[int]] = Field(
-        None,
-        description="可选的卡牌编号列表，将从这个列表中随机抽取3个数字作为卡牌编号。如果未提供、列表无效，或提供了无法解析的字符串，则从所有可用卡牌中抽取。"
-    )
-
-    @validator('card_number_pool', pre=True, always=True)
-    def parse_and_validate_card_number_pool(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, str):
-            try:
-                v = ast.literal_eval(v)
-            except (ValueError, SyntaxError) as e:
-                raise ValueError("card_number_pool: 输入字符串不是有效的列表字面量。")
-        if not isinstance(v, list):
-            raise ValueError('card_number_pool 必须是列表或表示列表的有效字符串。')
-        if len(v) < 3:
-            raise ValueError('card_number_pool 必须包含至少 3 个数字')
-        if not all(isinstance(i, int) for i in v):
-            raise ValueError('card_number_pool 必须只包含整数')
-        return v
 
 
 # --- 签名生成函数 (保持不变) ---
@@ -177,7 +139,7 @@ async def startup_event():
         app.state.db_pool = None
 
     # --- 【新增】启动提示词文件监控（热更新功能）---
-    from prompt_logic import start_prompt_file_watcher
+    from prompts.prompt_logic import start_prompt_file_watcher
     prompt_watcher = start_prompt_file_watcher()
     if prompt_watcher:
         app.state.prompt_watcher = prompt_watcher
@@ -771,8 +733,7 @@ async def stream_vllm_response_with_retry(prompt: str, request_id: str) -> Async
 
 
 # --- FastAPI 接口端点 (核心改造) ---
-@app.post("/chat_endpoints_V12_25")
-async def chat_endpoint(client_request: ClientRequest, request: Request):
+async def process_leinuo_llm_chat(client_request, request):
     global next_request_id_counter
     request_start_time = time.perf_counter()
     req_id = client_request.session_id or generate_request_id()

@@ -2,18 +2,18 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import logging
 
-from schemas.qimen import QimenLLMRequest
-from services.qimen import qimen_llm_service
+from schemas.ziwei import ZiweiYearRequest
+from services.ziwei import ziwei_year_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/chat_qimen", summary="奇门LLM对话")
-async def chat_qimen(client_request: QimenLLMRequest, request: Request):
-    """奇门LLM对话接口"""
+@router.post("/chat_year_V11_11", summary="紫微年运对话")
+async def chat_year(client_request: ZiweiYearRequest, request: Request):
+    """紫微年运对话接口"""
     try:
-        stream_generator = await qimen_llm_service.process_qimen_llm_chat(client_request, request)
+        stream_generator = await ziwei_year_service.process_ziwei_year(client_request, request)
         return stream_generator
     except HTTPException as he:
         raise he
