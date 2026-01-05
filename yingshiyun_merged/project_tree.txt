@@ -1,0 +1,119 @@
+.
+├── Dockerfile
+├── MIGRATION_GUIDE.md
+├── README.md
+├── __init__.py
+├── assets
+│   ├── __init__.py
+│   ├── bamen+bamen.csv
+│   ├── bamen.csv
+│   ├── bashen+bamen.csv
+│   ├── bashen.csv
+│   ├── dizhi.csv
+│   ├── jiugong.csv
+│   ├── jiuxing.csv
+│   ├── qiyizuhe.csv
+│   ├── shigan+bamen.csv
+│   ├── tiangan.csv
+│   ├── xyhs.xlsx
+│   ├── 卡牌vs牌号.csv
+│   └── 雷牌信息集合.csv
+├── clients
+│   ├── __init__.py
+│   ├── astro_api_client.py
+│   ├── external_api_client.py
+│   ├── shared_client.py
+│   └── vllm_client.py
+├── config.py
+├── database
+│   ├── __init__.py
+│   ├── db_manager.py
+│   ├── db_manager2.py
+│   └── db_manager_yingshi.py
+├── logs
+│   └── __init__.py
+├── main.py
+├── monitoring
+│   ├── __init__.py
+│   ├── monitor.py
+│   └── monitor_qimen.py
+├── project_tree.txt
+├── prompts
+│   ├── __init__.py
+│   ├── leinuo
+│   │   └── __init__.py
+│   ├── prompt_cofig_jili.py
+│   ├── prompt_config_jili2_year.py
+│   ├── prompt_logic.py
+│   ├── prompt_manager.py
+│   ├── prompts.py
+│   ├── qimen
+│   │   ├── __init__.py
+│   │   ├── final_response_prompt.xml
+│   │   ├── intent_classification_prompt.xml
+│   │   ├── qimen_type_classification_prompt.xml
+│   │   └── time_range_extraction_prompt.xml
+│   └── ziwei
+│       └── __init__.py
+├── requirements.txt
+├── routers
+│   ├── __init__.py
+│   └── leinuo_day.py
+├── schemas
+│   ├── __init__.py
+│   └── ziwei.py
+├── security
+│   ├── __init__.py
+│   └── verifier.py
+├── services
+│   ├── __init__.py
+│   ├── leinuo
+│   │   ├── __init__.py
+│   │   ├── day_service.py
+│   │   └── llm_service.py
+│   ├── llm
+│   │   ├── __init__.py
+│   │   ├── llm_calls.py
+│   │   └── llm_response.py
+│   ├── qimen
+│   │   ├── __init__.py
+│   │   ├── api_main_attributes.py
+│   │   ├── api_main_calendar.py
+│   │   ├── api_main_day.py
+│   │   ├── day_service.py
+│   │   ├── db_query.py
+│   │   ├── llm_service.py
+│   │   └── user_info_extractor.py
+│   ├── session
+│   │   ├── __init__.py
+│   │   └── session_manager.py
+│   ├── summary
+│   │   ├── __init__.py
+│   │   └── summary_service.py
+│   ├── validation
+│   │   ├── __init__.py
+│   │   ├── query_intent.py
+│   │   └── validation_rules.py
+│   ├── year_score
+│   │   ├── __init__.py
+│   │   └── score_service.py
+│   └── ziwei
+│       ├── __init__.py
+│       ├── chat_processor.py
+│       ├── chat_time_utils.py
+│       ├── llm_service.py
+│       ├── report_service.py
+│       ├── year_service.py
+│       └── ziwei_analyzer.py
+└── utils
+    ├── __init__.py
+    ├── liushifunction.py
+    ├── processing.py
+    ├── tiangan_function.py
+    ├── time_filters.py
+    ├── tokenizer.py
+    ├── utils.py
+    ├── xingyaoxingzhi.py
+    └── ziwei_ai_function.py
+
+22 directories, 94 files
